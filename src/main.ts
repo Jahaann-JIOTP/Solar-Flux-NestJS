@@ -9,6 +9,6 @@ async function bootstrap() {
   app.use(passport.initialize()); // ✅ Ensure Passport is initialized
 
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(process.env.PORT ?? 5002);
 }
 bootstrap();
