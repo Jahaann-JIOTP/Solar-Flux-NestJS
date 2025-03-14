@@ -934,32 +934,62 @@ export class DashboardService {
       const pipeline = [
         {
           $match: {
-            Day: { $regex: `^${currentYear}` } // Match only current year
-          }
+            Day: { $regex: `^${currentYear}` }, // Match only current year
+          },
         },
         {
           $addFields: {
-            year: { $substr: ['$Day', 0, 4] } // Extract year (YYYY)
-          }
+            year: { $substr: ['$Day', 0, 4] }, // Extract year (YYYY)
+          },
         },
         {
           $group: {
             _id: { year: '$year' },
-            active_power_sum: { $sum: '$active_power' }
-          }
+            active_power_sum: { $sum: '$active_power' },
+          },
         },
-        { $sort: { '_id.year': 1 as 1 | -1 } } // ✅ Fix TypeScript sorting issue
+        { $sort: { '_id.year': 1 as 1 | -1 } }, // ✅ Fix TypeScript sorting issue
       ];
 
       const results = await this.gmDayModel.aggregate(pipeline).exec();
 
       // Format response
-    const response = results.reduce((acc, record) => {
-      acc[record._id.year] = Math.round(record.active_power_sum);
-      return acc;
-    }, {});
+      const response = results.reduce((acc, record) => {
+        acc[record._id.year] = Math.round(record.active_power_sum);
+        return acc;
+      }, {});
 
-    return response;
+      return response;
     }
+  }
+  async getDashSufficiencyData(payload: { option: number }) {
+    const { option } = payload;
+
+    if (![1, 2, 3].includes(option)) {
+      throw new BadRequestException(
+        'Invalid option. Only options 1, 2, and 3 are supported.',
+      );
+    }
+
+    // Execute both APIs in parallel
+    const [statData, activeData] = await Promise.all([
+      this.getDashStatData({ option }),
+      this.getDashActiveData({ option }),
+    ]);
+
+    const kw = Number(statData?.kw) || 0;
+
+    // Extract the first value from activeData (since the key is dynamic)
+    const active_power_sum = Number(Object.values(activeData || {})[0]) || 0;
+    
+    // Perform division safely
+    const PV_Sufficiency = (kw / (kw + active_power_sum)) * 100;
+
+    // Return merged response with calculation
+    return {
+      // statData,
+      // activeData,
+      PV_Sufficiency,
+    };
   }
 }

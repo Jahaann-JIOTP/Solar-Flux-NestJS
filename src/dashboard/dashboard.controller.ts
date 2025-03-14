@@ -31,4 +31,9 @@ export class DashboardController {
   async getDashActiveData(@Body() dashCostDto: DashCostDto) {
     return await this.dashboardService.getDashActiveData(dashCostDto);
   }
+  @Post('get_dash_pv_sufficiency')  // 👈 Second API Added Here
+  @UsePipes(new ValidationPipe())  // ✅ Ensure validation is enabled
+  async getDashSufficiencyData(@Body() dashCostDto: DashCostDto) {
+    return await this.dashboardService.getDashSufficiencyData(dashCostDto);
+  }
 }
