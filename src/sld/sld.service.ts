@@ -30,15 +30,21 @@ export class SldService {
       const plants = plant
         ? [plant]
         : await this.overallDataModel.distinct('dataItemMap.Plant');
-      const orgChart = [];
+      const orgChart: any[] = []; 
       const targetDate = moment('2024-11-10').format('YYYY-MM-DD');
 
       for (const plantName of plants) {
-        const plantData = {
+        const plantData: {
+          name: string;
+          title: string;
+          image: string;
+          children: any[];  // 🔹 FIX: Explicitly set as an array of objects
+          [key: string]: any;
+        } = {
           name: plantName,
           title: `${tag === 'u' ? 'Voltage: 0 V' : tag === 'i' ? 'Current: 0 A' : 'Power: 0 KW'}`,
           image: '/assets/images/plant.png',
-          children: [],
+          children: [],  // ✅ Now TypeScript knows this is an array
           [tag]: 0,
         };
 
@@ -47,7 +53,7 @@ export class SldService {
         });
 
         for (const sn of snList) {
-          const snData = {
+          const snData: { name: string; title: string; image: string; children: any[]; [key: string]: any } = {
             name: sn,
             title: `${tag === 'u' ? 'Voltage: 0 V' : tag === 'i' ? 'Current: 0 A' : 'Power: 0 KW'}`,
             image: '/assets/images/inv.png',
@@ -63,7 +69,7 @@ export class SldService {
           );
 
           for (const mppt of mpptList) {
-            const mpptData = {
+            const mpptData: { name: string; title: string; image: string; children: any[]; [key: string]: any } = {
               name: mppt,
               title: `${tag === 'u' ? 'Voltage: 0 V' : tag === 'i' ? 'Current: 0 A' : 'Power: 0 KW'}`,
               image: '/assets/images/mppt.png',
@@ -111,11 +117,11 @@ export class SldService {
               }
             }
 
-            for (const string of Object.values(stringsData)) {
-              string[tag] = Math.round(string[tag] || 0);
-              string.title = `${tag === 'u' ? 'Voltage' : tag === 'i' ? 'Current' : 'Power'}: ${string[tag]} ${tag === 'u' ? 'V' : tag === 'i' ? 'A' : 'KW'}<br> Capacity: ${string.watt_string} W`;
-              mpptData.children.push(string);
-              mpptData[tag] += string[tag];
+            for (const item of Object.values(stringsData)) {
+              (item as any)[tag] = Math.round((item as any)[tag] || 0);
+              (item as any).title = `${tag === 'u' ? 'Voltage' : tag === 'i' ? 'Current' : 'Power'}: ${(item as any)[tag]} ${tag === 'u' ? 'V' : tag === 'i' ? 'A' : 'KW'}<br> Capacity: ${(item as any).watt_string} W`;
+              mpptData.children.push(item);
+              mpptData[tag] += (item as any)[tag];
             }
 
             mpptData[tag] = Math.round(mpptData[tag] || 0);
