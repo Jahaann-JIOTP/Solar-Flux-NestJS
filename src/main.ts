@@ -9,7 +9,7 @@ async function bootstrap() {
   app.use(passport.initialize()); // ✅ Ensure Passport is initialized
 // ✅ Enable CORS for frontend requests (Next.js)
 app.enableCors({
-  origin: "http://localhost:3000", // Replace with frontend URL
+  origin: "*", // Replace with frontend URL
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
   allowedHeaders: "Content-Type, Authorization",
   credentials: true, // Allow cookies & auth headers

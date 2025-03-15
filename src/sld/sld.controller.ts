@@ -9,6 +9,6 @@ export class SldController {
   @Post('org')
   @UsePipes(new ValidationPipe({ transform: true }))
   async getOrgChart(@Body() body: GetOrgChartDto) {
-    return await this.sldService.getOrgChartData(body.plant, body.option);
+    return await this.sldService.getOrgChartData(body.plant, body.option,body.targetDate);
   }
 }
