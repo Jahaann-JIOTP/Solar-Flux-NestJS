@@ -8,6 +8,7 @@ import { PrivilegesModule } from './privileges/privileges.module';
 import { RolesModule } from './roles/roles.module';
 import { AuthModule } from './auth/auth.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { SldModule } from './sld/sld.module';
 
 
 
@@ -28,7 +29,8 @@ import { DashboardModule } from './dashboard/dashboard.module';
       PrivilegesModule,
       RolesModule,
       AuthModule, 
-      DashboardModule,
+      DashboardModule, 
+      SldModule,
     ],
   })
   export class AppModule {}
