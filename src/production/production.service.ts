@@ -3,12 +3,16 @@ import { InjectModel } from "@nestjs/mongoose";
 import { Model } from "mongoose";
 import { SankeyRequestDto } from "./dto/inverter_mppt.dto";
 import { SankeyRecord } from "./schemas/overall.schema";
+import { SankeyData,SankeyDataDocument } from "./schemas/sankey-data.schema";
+import { SankeyDataDto } from "./dto/sankey_data.dto";
 
 @Injectable()
 export class ProductionService {
   constructor(
     @InjectModel(SankeyRecord.name)
-    private readonly sankeyModel: Model<SankeyRecord>
+    private readonly sankeyModel: Model<SankeyRecord>,
+    @InjectModel(SankeyData.name)
+        private SankeyDataModel: Model<SankeyDataDocument>,
   ) {}
 
   async getSankeyData(payload: SankeyRequestDto): Promise<any> {
@@ -118,4 +122,56 @@ export class ProductionService {
       throw new Error(`Error fetching MPPT data: ${error.message}`);
     }
   }
+
+  async generateSankeyData(dto: SankeyDataDto) {
+    const { Plant, startDate, endDate } = dto;
+
+    if (!Plant || !startDate || !endDate) {
+      throw new Error('Plant, startDate, and endDate are required.');
+    }
+
+    // Query MongoDB for the specified plant and date range
+    const plantData = await this.SankeyDataModel.find({
+      'dataItemMap.Plant': Plant,
+      timestamp: { $gte: startDate, $lte: endDate },
+    }).exec();
+
+    // Aggregate Plant Level Data
+    let totalValue = 0;
+    plantData.forEach(record => {
+      const P_abd = record.dataItemMap?.P_abd || 0;
+      totalValue += P_abd;
+    });
+
+    // First Level Data
+    const sankeyData = [
+      {
+        source: `[bold]${Plant}\n${Math.round(totalValue)} KW`,
+        target: `[bold]Sub Plant\n${Math.round(totalValue)} KW`,
+        value: Math.round(totalValue),
+      },
+    ];
+
+    // Aggregate by devId
+    const devIdValues: Record<string, number> = {};
+    plantData.forEach(record => {
+      const devId = record.dataItemMap?.sn;
+      const P_abd = record.dataItemMap?.P_abd || 0;
+      if (devId) {
+        devIdValues[devId] = (devIdValues[devId] || 0) + P_abd;
+      }
+    });
+
+    // Add devId entries to sankey data
+    Object.entries(devIdValues).forEach(([devId, value]) => {
+      sankeyData.push({
+        source: `[bold]Sub Plant\n${Math.round(totalValue)} KW`,
+        target: `[bold]${devId}\n${Math.round(value)} KW`,
+        value: Math.round(value),
+      });
+    });
+
+    return sankeyData;
+  }
+  
 } // ✅ This was previously misplaced, now correctly closes the class
