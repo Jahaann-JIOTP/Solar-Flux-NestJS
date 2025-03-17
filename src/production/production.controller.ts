@@ -2,6 +2,7 @@ import { Controller, Post, Body } from "@nestjs/common";
 import { ProductionService } from "./production.service";
 import { SankeyRequestDto } from "./dto/inverter_mppt.dto";
 import { MpptRequestDto } from './dto/mppt.dto'; // ✅ Import new DTO
+import { GetDevicesDto } from "./dto/devices.dto";
 
 @Controller("production")
 export class Production_inverterController {
@@ -12,8 +13,13 @@ export class Production_inverterController {
     return this.sankeyService.getSankeyData(sankeyRequestDto);
   }
 
-  @Post('mppt')
+  @Post('get-mppt')
   async getMppt(@Body() mpptRequestDto: MpptRequestDto) {
     return this.sankeyService.getMppt(mpptRequestDto.devId); // ✅ Correctly passing only `devId`
+  }
+
+  @Post('get-devices')
+  async getDevices(@Body() getDevicesDto: GetDevicesDto) {
+    return this.sankeyService.getDevices(getDevicesDto.station);
   }
 }
