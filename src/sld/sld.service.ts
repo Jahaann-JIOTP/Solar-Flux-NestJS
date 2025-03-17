@@ -30,9 +30,11 @@ export class SldService {
       const plants = plant
         ? [plant]
         : await this.overallDataModel.distinct("dataItemMap.Plant");
-      const orgChart: any[] = [];
-      targetDate = targetDate ? moment(targetDate).format("YYYY-MM-DD") : moment().format("YYYY-MM-DD");
-      
+
+      targetDate = targetDate
+        ? moment(targetDate).format("YYYY-MM-DD")
+        : moment().format("YYYY-MM-DD");
+
       // Aggregate query to get average temperature by sn and Day_Hour
       const avgTemperatures = await this.gtHourlyModel.aggregate([
         {
@@ -48,13 +50,13 @@ export class SldService {
         },
       ]);
 
-      // Create a dictionary for avg temperatures
-      const avgTempDict = Object.fromEntries(
-        avgTemperatures.map((item) => [
-          `${item._id.sn}_${item._id.Day_Hour}`,
-          item.average_temp,
-        ])
-      );
+      const avgTempDict = avgTemperatures.reduce((acc, item) => {
+        acc[`${item._id.sn}_${item._id.Day_Hour}`] =
+          Math.round(item.average_temp * 100) / 100; // ✅ 2 decimal places round off
+        return acc;
+      }, {});
+
+      const orgChart: any[] = [];
 
       for (const plantName of plants) {
         const plantData: {
@@ -104,10 +106,12 @@ export class SldService {
           };
 
           const wattStringInfo = await this.sumWattString(sn);
-          snData['inverter'] = wattStringInfo.totalWattString / 1000;
+          snData["inverter"] = wattStringInfo.totalWattString / 1000;
           snData.title = `${
             tag === "u" ? "Voltage" : tag === "i" ? "Current" : "Power"
-          }: ${snData[tag]} ${tag === "u" ? "V" : tag === "i" ? "A" : "KW"}<br> Avg Temp: ${snData.avg_temp}°C`;
+          }: ${snData[tag]} ${
+            tag === "u" ? "V" : tag === "i" ? "A" : "KW"
+          }<br> Avg Temp: ${snData.avg_temp}°C`;
 
           const mpptList = await this.overallDataModel.distinct(
             "dataItemMap.MPPT",
@@ -208,7 +212,9 @@ export class SldService {
           snData[tag] = Math.round(snData[tag] || 0);
           snData.title = `${
             tag === "u" ? "Voltage" : tag === "i" ? "Current" : "Power"
-          }: ${snData[tag]} ${tag === "u" ? "V" : tag === "i" ? "A" : "KW"}`;
+          }: ${snData[tag]} ${
+            tag === "u" ? "V" : tag === "i" ? "A" : "KW"
+          }<br> Avg Temp: ${snData.avg_temp}°C`;
 
           plantData.children.push(snData);
           plantData[tag] += snData[tag];
