@@ -14,7 +14,7 @@ import { User, UserSchema } from '../users/schemas/user.schema';
     PassportModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'S0LARFL2', // 🔑 JWT Secret Key
-      signOptions: { expiresIn: '1h' }, // Token expires in 1 hour
+      signOptions: { expiresIn: '7d' }, // Token expires in 1 hour
     }),
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]), // ✅ Register User model
   ],

@@ -60,6 +60,7 @@ export class UsersController {
   /**
    * Delete user (Only Admin can delete)
    */
+
   @Delete('delete/:id')
   @UseGuards(AuthGuard('jwt'))
   async deleteUser(@Param('id') id: string, @Req() req) {
@@ -71,5 +72,12 @@ export class UsersController {
       throw new UnauthorizedException('Unable to delete user');
     }
     return { message: `User has been deleted` };
+  }
+
+  // Get the singlr user profile data from db with roles and permissions by JWT
+  @Get('profile')
+  @UseGuards(AuthGuard('jwt')) // ✅ Protects the route
+  async getUsers(@Req() req) {
+    return this.usersService.getAllUsers();
   }
 }

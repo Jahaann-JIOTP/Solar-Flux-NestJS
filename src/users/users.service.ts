@@ -4,8 +4,10 @@ import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
 import { User, UserDocument } from './schemas/user.schema';
 import { CreateUserDto } from './dto/create-user.dto';
-import { Role } from '../roles/schemas/role.schema';
+import { Role , RoleDocument} from '../roles/schemas/role.schema';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { Privilege } from '../privileges/schemas/privilege.schema';
+
 
 @Injectable()
 export class UsersService {
@@ -93,7 +95,8 @@ export class UsersService {
   
     /**
      * Update user details
-     */async updateUser(userId: string, updateUserDto: UpdateUserDto): Promise<User> {
+     */
+    async updateUser(userId: string, updateUserDto: UpdateUserDto): Promise<User> {
   const user = await this.userModel.findById(userId).exec(); // ✅ Ensure `exec()` is called
   if (!user) {
     throw new NotFoundException('User not found');
@@ -145,5 +148,26 @@ export class UsersService {
   async updateUserPassword(userId: Types.ObjectId, newPassword: string): Promise<void> {
     await this.userModel.findByIdAndUpdate(userId.toString(), { password: newPassword });
   }  
+
+
+
+  
+ 
+  async findUserWithRole(userId: string): Promise<(User & { role: Role & { _id: Types.ObjectId; privileges: Privilege[] } }) | null> {
+      const user = await this.userModel
+          .findById(userId)
+          .populate({
+              path: 'role',
+              populate: {
+                  path: 'privileges',
+                  model: 'Privilege',
+                  select: '_id name'
+              }
+          })
+          .lean() // ✅ Converts to plain object
+          .exec();
+  
+      return user as (User & { role: Role & { _id: Types.ObjectId; privileges: Privilege[] } }) | null;
+  }
   
 }
