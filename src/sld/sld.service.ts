@@ -195,7 +195,20 @@ export class SldService {
                 tag === "u" ? "V" : tag === "i" ? "A" : "KW"
               }<br> Capacity: ${(item as any).watt_string} W`;
               mpptData.children.push(item);
-              mpptData[tag] += (item as any)[tag];
+              mpptData[tag] =
+                tag === "u"
+                  ? Math.round(
+                      mpptData.children.reduce(
+                        (sum, child) => sum + (child as any)[tag],
+                        0
+                      ) / mpptData.children.length
+                    )
+                  : Math.round(
+                      mpptData.children.reduce(
+                        (sum, child) => sum + (child as any)[tag],
+                        0
+                      )
+                    );
             }
 
             mpptData[tag] = Math.round(mpptData[tag] || 0);
@@ -206,7 +219,20 @@ export class SldService {
             }`;
 
             snData.children.push(mpptData);
-            snData[tag] += mpptData[tag];
+            snData[tag] =
+              tag === "u"
+                ? Math.round(
+                    snData.children.reduce(
+                      (sum, child) => sum + (child as any)[tag],
+                      0
+                    ) / snData.children.length
+                  )
+                : Math.round(
+                    snData.children.reduce(
+                      (sum, child) => sum + (child as any)[tag],
+                      0
+                    )
+                  );
           }
 
           snData[tag] = Math.round(snData[tag] || 0);
@@ -217,7 +243,20 @@ export class SldService {
           }<br> Avg Temp: ${snData.avg_temp}°C`;
 
           plantData.children.push(snData);
-          plantData[tag] += snData[tag];
+          plantData[tag] =
+            tag === "u"
+              ? Math.round(
+                  plantData.children.reduce(
+                    (sum, child) => sum + (child as any)[tag],
+                    0
+                  ) / plantData.children.length
+                )
+              : Math.round(
+                  plantData.children.reduce(
+                    (sum, child) => sum + (child as any)[tag],
+                    0
+                  )
+                );
         }
 
         plantData[tag] = Math.round(plantData[tag] || 0);
