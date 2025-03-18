@@ -4,6 +4,8 @@ import { SankeyRequestDto } from "./dto/inverter_mppt.dto";
 import { MpptRequestDto } from './dto/mppt.dto'; // ✅ Import new DTO
 import { GetDevicesDto } from "./dto/devices.dto";
 import { SankeyDataDto } from "./dto/sankey_data.dto";
+import { SankeyDto } from "./dto/sankey.dto";
+
 
 @Controller("production")
 export class Production_inverterController {
@@ -23,8 +25,17 @@ export class Production_inverterController {
   async getDevices(@Body() getDevicesDto: GetDevicesDto) {
     return this.sankeyService.getDevices(getDevicesDto.station);
   }
+
   @Post('sankey-data')
   async generateSankeyData(@Body() dto: SankeyDataDto) {
     return this.sankeyService.generateSankeyData(dto);
   }
+
+  @Post('sankey')
+  async SankeyData(@Body() sankeyDto: SankeyDto) {
+    return this.sankeyService.SankeyData(sankeyDto);
+
+  }
 }
+
+

@@ -1,10 +1,12 @@
-import { Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { Model } from "mongoose";
 import { SankeyRequestDto } from "./dto/inverter_mppt.dto";
 import { SankeyRecord } from "./schemas/overall.schema";
 import { SankeyData,SankeyDataDocument } from "./schemas/sankey-data.schema";
 import { SankeyDataDto } from "./dto/sankey_data.dto";
+import { SankeyDto } from "./dto/sankey.dto";
+import { PlantDayRecord } from "./schemas/plant_day.schema"; // ✅ Corrected schema
 
 @Injectable()
 export class ProductionService {
@@ -13,6 +15,9 @@ export class ProductionService {
     private readonly sankeyModel: Model<SankeyRecord>,
     @InjectModel(SankeyData.name)
         private SankeyDataModel: Model<SankeyDataDocument>,
+
+    @InjectModel(PlantDayRecord.name)
+    private readonly plantDayModel: Model<PlantDayRecord>
   ) {}
 
   async getSankeyData(payload: SankeyRequestDto): Promise<any> {
@@ -123,6 +128,7 @@ export class ProductionService {
     }
   }
 
+
   async generateSankeyData(dto: SankeyDataDto) {
     const { Plant, startDate, endDate } = dto;
 
@@ -174,4 +180,103 @@ export class ProductionService {
     return sankeyData;
   }
   
-} // ✅ This was previously misplaced, now correctly closes the class
+ // ✅ This was previously misplaced, now correctly closes the class
+
+  
+    async SankeyData(payload: SankeyDto): Promise<any> {
+      const { options, start_date, end_date } = payload;
+  
+      if (!options || options.length === 0 || !options.every(opt => opt >= 1 && opt <= 5)) {
+        throw new BadRequestException("Invalid options. Each must be between 1 and 5.");
+      }
+  
+      // Convert date formats
+      const startDateStr = new Date(start_date).toISOString().split("T")[0];
+      const endDateStr = new Date(end_date).toISOString().split("T")[0];
+  
+      // ✅ Fetch data from `Plant_Day` collection
+      const data = await this.plantDayModel.find({
+        timestamp: { $gte: startDateStr, $lte: endDateStr }
+      }).lean(); // Use lean() for better performance
+  
+      if (!data.length) {
+        throw new NotFoundException("No data found for the specified date range.");
+      }
+  
+      // ✅ Aggregation variables
+      let province_totals: Record<string, number> = {};
+      let city_totals: Record<string, Record<string, number>> = {};
+      let plant_totals: Record<string, Record<string, Record<string, number>>> = {};
+  
+      for (const record of data) {
+        // ✅ Use correct field access based on document structure
+        const province = record.Province || "Unknown";
+        const city = record.City || "Unknown";
+        const plant = record.Plant || "Unknown";
+        const power = record.dataItemMap?.inverter_power || 0;
+  
+        // ✅ Province-level aggregation
+        province_totals[province] = (province_totals[province] || 0) + power;
+  
+        // ✅ City-level aggregation
+        if (!city_totals[province]) city_totals[province] = {};
+        city_totals[province][city] = (city_totals[province][city] || 0) + power;
+  
+        // ✅ Plant-level aggregation
+        if (!plant_totals[province]) plant_totals[province] = {};
+        if (!plant_totals[province][city]) plant_totals[province][city] = {};
+        plant_totals[province][city][plant] = (plant_totals[province][city][plant] || 0) + power;
+      }
+  
+      const sankey_data: { source: string; target: string; value: number }[] = [];
+      const overall_total = Object.values(province_totals).reduce((a, b) => a + b, 0).toFixed(2); // ✅ Preserve decimals
+      
+      // Nationwide -> Province level
+      if (options.includes(1) && options.includes(2)) {
+        for (const province in province_totals) {
+          sankey_data.push({
+            source: `[bold]Nationwide\n${overall_total} KW`,
+            target: `[bold]${province}\n${province_totals[province].toFixed(2)} KW`,
+            value: Number(province_totals[province].toFixed(2)) // ✅ Preserve decimals
+          });
+        }
+      }
+      
+      // Province -> City level
+      if (options.includes(2) && options.includes(3)) {
+        for (const province in city_totals) {
+          for (const city in city_totals[province]) {
+            sankey_data.push({
+              source: `[bold]${province}\n${province_totals[province].toFixed(2)} KW`,
+              target: `[bold]${city}\n${city_totals[province][city].toFixed(2)} KW`,
+              value: Number(city_totals[province][city].toFixed(2)) // ✅ Preserve decimals
+            });
+          }
+        }
+      }
+      
+      // City -> Plant level
+      if (options.includes(3) && options.includes(4)) {
+        for (const province in plant_totals) {
+          for (const city in plant_totals[province]) {
+            for (const plant in plant_totals[province][city]) {
+              sankey_data.push({
+                source: `[bold]${city}\n${city_totals[province][city].toFixed(2)} KW`,
+                target: `[bold]${plant}\n${plant_totals[province][city][plant].toFixed(2)} KW`,
+                value: Number(plant_totals[province][city][plant].toFixed(2)) // ✅ Preserve decimals
+              });
+            }
+          }
+        }
+      }
+      
+  
+      return sankey_data;
+    }
+  }
+  
+  
+  
+  
+  
+  
