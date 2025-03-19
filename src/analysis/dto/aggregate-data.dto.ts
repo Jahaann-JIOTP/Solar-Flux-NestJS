@@ -30,4 +30,5 @@ export class AggregateDataDto {
   @IsOptional()
   @IsEnum(AttributeType)
   attribute?: AttributeType; // Voltage, Current, or Power
+  
 }
