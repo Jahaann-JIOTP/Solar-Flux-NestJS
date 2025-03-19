@@ -182,12 +182,12 @@ export class ProductionService {
   
  // ✅ This was previously misplaced, now correctly closes the class
 
-  
+
     async SankeyData(payload: SankeyDto): Promise<any> {
       const { options, start_date, end_date } = payload;
   
       if (!options || options.length === 0 || !options.every(opt => opt >= 1 && opt <= 5)) {
-        throw new BadRequestException("Invalid options. Each must be between 1 and 5.");
+          throw new BadRequestException("Invalid options. Each must be between 1 and 5.");
       }
   
       // Convert date formats
@@ -196,83 +196,117 @@ export class ProductionService {
   
       // ✅ Fetch data from `Plant_Day` collection
       const data = await this.plantDayModel.find({
-        timestamp: { $gte: startDateStr, $lte: endDateStr }
-      }).lean(); // Use lean() for better performance
+          timestamp: { $gte: startDateStr, $lte: endDateStr }
+      }).lean();
   
       if (!data.length) {
-        throw new NotFoundException("No data found for the specified date range.");
+          throw new NotFoundException("No data found for the specified date range.");
       }
   
       // ✅ Aggregation variables
-      let province_totals: Record<string, number> = {};
-      let city_totals: Record<string, Record<string, number>> = {};
-      let plant_totals: Record<string, Record<string, Record<string, number>>> = {};
+      let province_totals: Record<string, number> = {}; // Store power totals for each province
+      let city_totals: Record<string, number> = {}; // Store power totals for each city
+      let plant_totals: Record<string, { city: string, province: string, value: number }> = {}; // Store power for each plant
   
+      // ✅ Data Aggregation
       for (const record of data) {
-        // ✅ Use correct field access based on document structure
-        const province = record.Province || "Unknown";
-        const city = record.City || "Unknown";
-        const plant = record.Plant || "Unknown";
-        const power = record.dataItemMap?.inverter_power || 0;
+          const province = record.Province || "Unknown";
+          const city = record.City || "Unknown";
+          const plant = record.Plant || "Unknown";
+          const power = record.dataItemMap?.inverter_power || 0;
   
-        // ✅ Province-level aggregation
-        province_totals[province] = (province_totals[province] || 0) + power;
+          // ✅ Aggregate Province Level Data
+          province_totals[province] = (province_totals[province] || 0) + power;
   
-        // ✅ City-level aggregation
-        if (!city_totals[province]) city_totals[province] = {};
-        city_totals[province][city] = (city_totals[province][city] || 0) + power;
+          // ✅ Aggregate City Level Data
+          city_totals[city] = (city_totals[city] || 0) + power;
   
-        // ✅ Plant-level aggregation
-        if (!plant_totals[province]) plant_totals[province] = {};
-        if (!plant_totals[province][city]) plant_totals[province][city] = {};
-        plant_totals[province][city][plant] = (plant_totals[province][city][plant] || 0) + power;
+          // ✅ Aggregate Plant Level Data
+          if (!plant_totals[plant]) {
+              plant_totals[plant] = { city, province, value: 0 };
+          }
+          plant_totals[plant].value += power;
       }
   
+      // ✅ Build Sankey Data
       const sankey_data: { source: string; target: string; value: number }[] = [];
-      const overall_total = Object.values(province_totals).reduce((a, b) => a + b, 0).toFixed(2); // ✅ Preserve decimals
-      
-      // Nationwide -> Province level
+      const overall_total = Object.values(province_totals).reduce((a, b) => a + b, 0).toFixed(2);
+  
+      // ✅ **Nationwide → Province Level (For Options 1 & 2)**
       if (options.includes(1) && options.includes(2)) {
-        for (const province in province_totals) {
-          sankey_data.push({
-            source: `[bold]Nationwide\n${overall_total} KW`,
-            target: `[bold]${province}\n${province_totals[province].toFixed(2)} KW`,
-            value: Number(province_totals[province].toFixed(2)) // ✅ Preserve decimals
-          });
-        }
-      }
-      
-      // Province -> City level
-      if (options.includes(2) && options.includes(3)) {
-        for (const province in city_totals) {
-          for (const city in city_totals[province]) {
-            sankey_data.push({
-              source: `[bold]${province}\n${province_totals[province].toFixed(2)} KW`,
-              target: `[bold]${city}\n${city_totals[province][city].toFixed(2)} KW`,
-              value: Number(city_totals[province][city].toFixed(2)) // ✅ Preserve decimals
-            });
-          }
-        }
-      }
-      
-      // City -> Plant level
-      if (options.includes(3) && options.includes(4)) {
-        for (const province in plant_totals) {
-          for (const city in plant_totals[province]) {
-            for (const plant in plant_totals[province][city]) {
+          for (const province in province_totals) {
               sankey_data.push({
-                source: `[bold]${city}\n${city_totals[province][city].toFixed(2)} KW`,
-                target: `[bold]${plant}\n${plant_totals[province][city][plant].toFixed(2)} KW`,
-                value: Number(plant_totals[province][city][plant].toFixed(2)) // ✅ Preserve decimals
+                  source: `[bold]Nationwide\n${overall_total} KW`,
+                  target: `[bold]${province}\n${province_totals[province].toFixed(2)} KW`,
+                  value: Number(province_totals[province].toFixed(2))
               });
-            }
           }
-        }
       }
-      
+  
+      // ✅ **Province → City Level (For Options 1, 2, 3)**
+      if (options.includes(1) && options.includes(2) && options.includes(3)) {
+          for (const city in city_totals) {
+              const province = data.find(d => d.City === city)?.Province || "Unknown"; // Find province for the city
+              sankey_data.push({
+                  source: `[bold]${province}\n${province_totals[province].toFixed(2)} KW`,
+                  target: `[bold]${city}\n${city_totals[city].toFixed(2)} KW`,
+                  value: Number(city_totals[city].toFixed(2))
+              });
+          }
+      }
+  
+      // ✅ **Province → Plant Level (For Options 1, 2, 5)**
+      if (options.includes(1) && options.includes(2) && options.includes(5)) {
+          for (const plant in plant_totals) {
+              const { province, value } = plant_totals[plant];
+              sankey_data.push({
+                  source: `[bold]${province}\n${province_totals[province].toFixed(2)} KW`,
+                  target: `[bold]${plant}\n${value.toFixed(2)} KW`,
+                  value: Number(value.toFixed(2))
+              });
+          }
+      }
+  
+      // ✅ **Nationwide → City Level (For Options 1, 3, 5)**
+      if (options.includes(1) && options.includes(3) && options.includes(5)) {
+          for (const city in city_totals) {
+              sankey_data.push({
+                  source: `[bold]Nationwide\n${overall_total} KW`,
+                  target: `[bold]${city}\n${city_totals[city].toFixed(2)} KW`,
+                  value: Number(city_totals[city].toFixed(2))
+              });
+          }
+      }
+  
+      // ✅ **Nationwide → Plant Level (For Options 1, 3, 5)**
+      if (options.includes(1) && options.includes(3) && options.includes(5)) {
+          for (const plant in plant_totals) {
+            const city = plant_totals[plant].city;
+               sankey_data.push({
+                  source: `[bold]${city}\n${city_totals[city].toFixed(2)} KW`,
+                  target: `[bold]${plant}\n${plant_totals[plant].value.toFixed(2)} KW`,
+                  value: Number(plant_totals[plant].value.toFixed(2))
+              });
+          }
+      }
+  
+      // ✅ **City → Plant Level Mapping (For Option 5)**
+      if (options.includes(5)) {
+          for (const plant in plant_totals) {
+              const city = plant_totals[plant].city;
+              // sankey_data.push({
+              //     source: `[bold]${city}\n${city_totals[city].toFixed(2)} KW`,
+              //     target: `[bold]${plant}\n${plant_totals[plant].value.toFixed(2)} KW`,
+              //     value: Number(plant_totals[plant].value.toFixed(2))
+              // });
+          }
+      }
   
       return sankey_data;
-    }
+  }
+
+  
+  
   }
   
   

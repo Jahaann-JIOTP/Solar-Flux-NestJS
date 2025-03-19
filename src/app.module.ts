@@ -10,6 +10,7 @@ import { AuthModule } from './auth/auth.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { SldModule } from './sld/sld.module';
 import { ProductionModule } from './production/production.module';
+import { AnalysisModule } from './analysis/analysis.module';
 
 
 
@@ -27,6 +28,7 @@ import { ProductionModule } from './production/production.module';
       }),
       AppFeatureModule,
       UsersModule,
+      AnalysisModule,
       PrivilegesModule,
       RolesModule,
       AuthModule, 
