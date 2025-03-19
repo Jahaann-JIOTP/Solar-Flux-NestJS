@@ -3,7 +3,6 @@ import { InjectModel } from "@nestjs/mongoose";
 import { Model } from "mongoose";
 import { FinalFormatRecord } from "./schemas/final_format.schema";
 import { AggregateDataDto, AttributeType } from "./dto/aggregate-data.dto";
-// import { AttributeType } from "./dto/aggregate-data.dto";
 
 @Injectable()
 export class AnalysisService {
@@ -14,29 +13,34 @@ export class AnalysisService {
 
   async aggregateData(payload: AggregateDataDto): Promise<any> {
     const { start_date, end_date, plant, inverter, mppt, attribute } = payload;
-  
+
     if (!start_date || !end_date) {
       throw new BadRequestException("start_date and end_date are required.");
     }
-  
-    // Convert date formats
+
+    // ✅ Convert date formats
     const startDateObj = new Date(start_date);
     const endDateObj = new Date(end_date);
     startDateObj.setHours(0, 0, 0, 0);
     endDateObj.setHours(23, 59, 59, 999);
-  
-    // Base query filter
+
+    // ✅ Convert Dates to String Format to Match Database Timestamp Field
+    const startDateStr = startDateObj.toISOString().replace("T", " ").split(".")[0];
+    const endDateStr = endDateObj.toISOString().replace("T", " ").split(".")[0];
+
+    // ✅ Base Query Filter
     const query: any = {
       timestamp: {
-        $gte: startDateObj.toISOString().replace("T", " ").split(".")[0],
-        $lte: endDateObj.toISOString().replace("T", " ").split(".")[0]
+        $gte: startDateStr,
+        $lte: endDateStr
       }
     };
-  
+
     if (plant) query["Plant"] = plant;
     if (inverter) query["sn"] = inverter;
     if (mppt) query["MPPT"] = mppt;
-  
+
+    // ✅ MPPT Filter (Ensure valid MPPT values)
     const mpptFilter = {
       $expr: {
         $and: [
@@ -45,15 +49,15 @@ export class AnalysisService {
         ]
       }
     };
-  
-    // ** Attribute Selection Logic**
-let selectedAttribute: any = "$u"; // Default: Voltage
-if (attribute === AttributeType.Current) selectedAttribute = "$i";
-if (attribute === AttributeType.Power) selectedAttribute = { $multiply: ["$u", "$i"] };
 
+    // ✅ **Dynamically Select Attribute Calculation**
+    let selectedAttribute: any = "$u"; // Default: Voltage
+    if (attribute === AttributeType.Current) selectedAttribute = "$i";
+    if (attribute === AttributeType.Power) selectedAttribute = { $multiply: ["$u", "$i"] };
 
     let pipeline: any[] = [];
-  
+
+    // ✅ Case 1: Plant, Inverter, and MPPT are selected
     if (plant && inverter && mppt) {
       pipeline = [
         { $match: { ...query, ...mpptFilter } },
@@ -66,7 +70,7 @@ if (attribute === AttributeType.Power) selectedAttribute = { $multiply: ["$u", "
               sn: inverter,
               mppt: mppt
             },
-            value1: { $avg: selectedAttribute } // ** Dynamic Attribute**
+            value1: { $avg: selectedAttribute } // **Dynamic Attribute**
           }
         },
         {
@@ -85,7 +89,10 @@ if (attribute === AttributeType.Power) selectedAttribute = { $multiply: ["$u", "
         },
         { $sort: { _id: 1 } }
       ];
-    } else if (plant && inverter && !mppt) {
+    }
+
+    // ✅ Case 2: Plant and Inverter are selected, but MPPT is not
+    else if (plant && inverter && !mppt) {
       pipeline = [
         { $match: { ...query, ...mpptFilter } },
         {
@@ -96,7 +103,7 @@ if (attribute === AttributeType.Power) selectedAttribute = { $multiply: ["$u", "
               plant: plant,
               sn: inverter
             },
-            value1: { $avg: selectedAttribute } // ** Dynamic Attribute**
+            value1: { $avg: selectedAttribute } // **Dynamic Attribute**
           }
         },
         {
@@ -114,7 +121,10 @@ if (attribute === AttributeType.Power) selectedAttribute = { $multiply: ["$u", "
         },
         { $sort: { _id: 1 } }
       ];
-    } else {
+    }
+
+    // ✅ Case 3: Only Plant is selected
+    else {
       pipeline = [
         { $match: { ...query, ...mpptFilter } },
         {
@@ -123,7 +133,7 @@ if (attribute === AttributeType.Power) selectedAttribute = { $multiply: ["$u", "
               timestamp: "$timestamp",
               sn: "$sn"
             },
-            value1: { $avg: selectedAttribute } // ** Dynamic Attribute**
+            value1: { $avg: selectedAttribute } // **Dynamic Attribute**
           }
         },
         {
@@ -140,15 +150,17 @@ if (attribute === AttributeType.Power) selectedAttribute = { $multiply: ["$u", "
         { $sort: { _id: 1 } }
       ];
     }
-  
+
+    // ✅ Run the aggregation query
     const results = await this.finalFormatModel.aggregate(pipeline);
     const output: { timestamp: string; values: { sn: string; value1: number; Strings: string; Plant: string; mppt: string }[] }[] = [];
-  
+
+    // ✅ Format the output response
     if (results.length) {
       for (const result of results) {
         const timestamp = result._id;
         const values = result.values || [];
-  
+
         const formattedValues = values.map((value: any) => ({
           sn: plant && inverter && payload.mppt ? value.Strings : plant && inverter ? value.mppt : value.sn,
           value1: value.value1,
@@ -156,18 +168,20 @@ if (attribute === AttributeType.Power) selectedAttribute = { $multiply: ["$u", "
           Plant: value.Plant || "",
           mppt: value.mppt || ""
         }));
-  
+
         output.push({ timestamp, values: formattedValues });
       }
     } else {
       output.push({
-        timestamp: startDateObj.toISOString().replace("T", " ").split(".")[0],
+        timestamp: startDateStr,
         values: [{ sn: "Unknown", value1: 0.0, Strings: "", Plant: "", mppt: "" }]
       });
     }
-  
+
     return output;
   }
+}
+
 
 
 // async aggregateData(payload: AggregateDataDto): Promise<any> {
@@ -340,4 +354,4 @@ if (attribute === AttributeType.Power) selectedAttribute = { $multiply: ["$u", "
   
   
   
-}
+
