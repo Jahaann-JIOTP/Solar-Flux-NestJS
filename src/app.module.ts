@@ -11,6 +11,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { SldModule } from './sld/sld.module';
 import { ProductionModule } from './production/production.module';
 import { AnalysisModule } from './analysis/analysis.module';
+import { SolaranalyticsModule } from './solaranalytics/solaranalytics.module';
 
 
 
@@ -33,7 +34,7 @@ import { AnalysisModule } from './analysis/analysis.module';
       RolesModule,
       AuthModule, 
       DashboardModule, 
-      SldModule, ProductionModule,
+      SldModule, ProductionModule, SolaranalyticsModule,
     ],
   })
   export class AppModule {}
