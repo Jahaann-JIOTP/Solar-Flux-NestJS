@@ -19,7 +19,7 @@ export class AnalysisService {
     }
 
     const startDateObj = `${start_date} 00:00:00`;
-const endDateObj = `${end_date} 23:59:59`;
+    const endDateObj = `${end_date} 23:59:59`;
   
     // Base query filter
     const query: any = {
@@ -172,5 +172,5 @@ const endDateObj = `${end_date} 23:59:59`;
     }
 
     return output;
-  }
+  } 
 }
