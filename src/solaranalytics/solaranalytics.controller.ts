@@ -1,6 +1,7 @@
 import { Controller, Post, Body, HttpException, HttpStatus } from '@nestjs/common';
 import { SolarAnalyticsService } from './solaranalytics.service';
 import { GetStringsDto } from './dto/get-strings.dto';
+import { GroupedEfficiencyDto } from './dto/grouped-efficiency.dto';
 
 @Controller('solaranalytics')
 export class SolarAnalyticsController {
@@ -13,4 +14,9 @@ export class SolarAnalyticsController {
         throw new HttpException({ error: error.message }, HttpStatus.INTERNAL_SERVER_ERROR);
       }
     }
+
+    @Post('grouped_data_efficency')
+  async getGroupedEfficiency(@Body() dto: GroupedEfficiencyDto) {
+    return this.SolaranalyticsService.getGroupedEfficiency(dto);
+  }
 }
