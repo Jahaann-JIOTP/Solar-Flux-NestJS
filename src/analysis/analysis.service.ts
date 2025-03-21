@@ -574,3 +574,5 @@ if (resolution === ResolutionType.Yearly) {
     return output;
   }
 }
+
+//Currently i have take average of power but will chnage it later
