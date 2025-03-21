@@ -43,4 +43,8 @@ export class SolarAnalyticsController {
   async getGrouped(@Body() dto: GroupedEfficiencyDto) {
     return this.SolaranalyticsService.getGrouped(dto);
   }
+  @Post("chart-water-data")
+  async getwaterfall(@Body() dto: GroupedEfficiencyDto) {
+    return this.SolaranalyticsService.getwaterfall(dto);
+  }
 }

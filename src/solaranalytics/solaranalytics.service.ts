@@ -116,7 +116,7 @@ export class SolarAnalyticsService {
       throw new Error(`Error fetching efficiency data: ${error.message}`);
     }
   }
-
+//generation and cost
   async getData(dto: GetDataDto) {
     const { start_date, end_date, plant, inverter, mppt, string, option, ph } =
       dto;
@@ -293,4 +293,55 @@ export class SolarAnalyticsService {
       throw new Error(`Error fetching efficiency data: ${error.message}`);
     }
   }
-}
+//waterfall
+  async getwaterfall(dto: GroupedEfficiencyDto) {
+    const { start_date, end_date, plant, inverter, mppt, string } = dto;
+    // Parse dates
+    const startDate = moment(start_date, 'YYYY-MM-DD').format('YYYY-MM-DD');
+    const endDate = moment(end_date, 'YYYY-MM-DD').format('YYYY-MM-DD');
+
+    // Build the aggregation pipeline
+    const pipeline: any[] = [
+      {
+        $match: {
+          Day: { $gte: startDate, $lte: endDate },
+          Plant: plant,
+          ...(inverter ? { sn: inverter } : {}),
+          ...(mppt ? { MPPT: mppt } : {}),
+          ...(string ? { Strings: string } : {}),
+        },
+      },
+      {
+        $group: {
+          _id: { month: { $substr: ['$Day', 0, 7] } },
+          total_P_abd: { $sum: '$P_abd' },
+        },
+      },
+      { $sort: { '_id.month': 1 } },
+    ];
+
+    // Execute the aggregation query
+    const records = await this.StringDayModel.aggregate(pipeline);
+
+    // Prepare result data
+    let previousValue = 0;
+    const result = records.map((record) => {
+      const monthYear = record._id.month;
+      const value = record.total_P_abd;
+      const diffValue = parseFloat((value - previousValue).toFixed(2));
+
+      previousValue = value;
+
+      return {
+        category: monthYear,
+        value: diffValue,
+        open: diffValue,
+        stepValue: parseFloat(value.toFixed(2)),
+        displayValue: diffValue,
+      };
+    });
+
+    return result;
+  }
+  }
+
