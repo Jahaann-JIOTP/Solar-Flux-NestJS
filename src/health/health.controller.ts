@@ -4,6 +4,7 @@ import { GetHourlyValuesDto } from './dto/get-hourly-values.dto';
 import { GetRadiationIntensityDto } from './dto/get-radiation-intensity.dto';
 import { GetHourlyValuesInterDto } from './dto/get-hourly-inter.dto';
 import { RadiationIntensityInterDto } from './dto/radiation-intensity-inter.dto';
+import { TemperatureDto } from './dto/temperature.dto';
 
 @Controller('health')
 export class HealthController {
@@ -23,6 +24,10 @@ export class HealthController {
     @Post('radiation_intensity_inter')
     async getRadiationIntensityInter(@Body() dto: RadiationIntensityInterDto) {
       return this.HealthService.getRadiationIntensityInter(dto);
+    }
+    @Post('temperature')
+    async getTemperatureData(@Body() dto: TemperatureDto) {
+      return this.HealthService.getTemperatureData(dto);
     }
 }
 

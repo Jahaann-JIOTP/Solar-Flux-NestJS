@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString ,IsIn} from 'class-validator';
 
 export class GetHourlyValuesInterDto {
   @IsNotEmpty()
@@ -14,4 +14,11 @@ export class GetHourlyValuesInterDto {
   @IsOptional() @IsString() inverter1?: string;
   @IsOptional() @IsString() mppt1?: string;
   @IsOptional() @IsString() string1?: string;
+
+
+   @IsString()
+    @IsIn(["power", "current", "voltage"], {
+      message: "Invalid option. Choose from: power, current, voltage",
+    })
+    option: string;
 }

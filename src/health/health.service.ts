@@ -8,16 +8,19 @@ import { RadiationData } from "./schemas/radiation.schema";
 import { GetRadiationIntensityDto } from "./dto/get-radiation-intensity.dto";
 import { GetHourlyValuesInterDto } from "./dto/get-hourly-inter.dto";
 import { RadiationIntensityInterDto } from "./dto/radiation-intensity-inter.dto";
+import { GTHourly } from "./schemas/temperature.schema";
+import { TemperatureDto } from "./dto/temperature.dto";
 import * as moment from "moment";
 
 @Injectable()
 export class HealthService {
   constructor(
     @InjectModel(StringHour.name) private StringHourModel: Model<StringHour>,
-    @InjectModel("RadiationData") private readonly radiationModel: Model<any>
+    @InjectModel("RadiationData") private readonly radiationModel: Model<any>,
+    @InjectModel(GTHourly.name) private gtHourlyModel: Model<GTHourly>
   ) {}
   async getHourlyValues(dto: GetHourlyValuesDto) {
-    const { start_date, end_date, plant, inverter, mppt, string } = dto;
+    const { start_date, end_date, plant, inverter, mppt, string, option } = dto;
 
     const startDate = start_date.substring(0, 10);
     const endDate = end_date.substring(0, 10);
@@ -33,6 +36,9 @@ export class HealthService {
     if (inverter) query["sn"] = inverter;
     if (mppt) query["MPPT"] = mppt;
     if (string) query["Strings"] = string;
+    let field = "$P_abd"; // Default: Power
+    if (option === "voltage") field = "$u";
+    else if (option === "current") field = "$i";
 
     const pipeline = [
       { $match: query },
@@ -46,7 +52,7 @@ export class HealthService {
             ...(mppt && { mppt: "$MPPT" }),
             ...(string && { string: "$Strings" }),
           },
-          avg_u: { $sum: "$P_abd" },
+          avg_value: { $sum: field },
         },
       },
       {
@@ -55,7 +61,7 @@ export class HealthService {
           hourly_values: {
             $push: {
               hour: "$_id.hour",
-              value: "$avg_u",
+              value: "$avg_value",
             },
           },
         },
@@ -147,12 +153,20 @@ export class HealthService {
 
   async getHourlyValuesInter(dto: GetHourlyValuesInterDto): Promise<any> {
     const {
-      date, plant, inverter, mppt, string,
-      plant1, inverter1, mppt1, string1,
+      date,
+      plant,
+      inverter,
+      mppt,
+      string,
+      plant1,
+      inverter1,
+      mppt1,
+      string1,
+      option,
     } = dto;
-  
+
     const date_filter = date.slice(0, 10);
-  
+
     const buildQuery = (p?: string, i?: string, m?: string, s?: string) => {
       const query: any = { Day_Hour: { $regex: `^${date_filter}` } };
       if (p) query["Plant"] = p;
@@ -161,7 +175,7 @@ export class HealthService {
       if (s) query["Strings"] = s;
       return query;
     };
-  
+
     const buildPipeline = (query: any) => {
       const grouping: any = {
         date: { $substr: ["$Day_Hour", 0, 10] },
@@ -171,14 +185,18 @@ export class HealthService {
       if (query["sn"]) grouping.inverter = "$sn";
       if (query["MPPT"]) grouping.mppt = "$MPPT";
       if (query["Strings"]) grouping.string = "$Strings";
-  
+
+      let field = "$P_abd"; // Default Power
+      if (option === "voltage") field = "$u";
+      else if (option === "current") field = "$i";
+
       return [
         { $match: query },
         {
           $group: {
             _id: grouping,
-            avg_u: { $sum: "$P_abd" }
-          }
+            avg_u: { $sum: field },
+          },
         },
         {
           $group: {
@@ -186,25 +204,25 @@ export class HealthService {
             hourly_values: {
               $push: {
                 hour: "$_id.hour",
-                value: "$avg_u"
-              }
-            }
-          }
+                value: "$avg_u",
+              },
+            },
+          },
         },
         { $sort: { _id: 1 as 1 | -1 } },
-       
       ];
     };
-  
+
     const query1 = buildQuery(plant, inverter, mppt, string);
     const query2 = buildQuery(plant1, inverter1, mppt1, string1);
     const pipeline1 = buildPipeline(query1);
     const pipeline2 = buildPipeline(query2);
-  
+
     const results_set1 = await this.StringHourModel.aggregate(pipeline1).exec();
     const results_set2 = await this.StringHourModel.aggregate(pipeline2).exec();
-  
-    let key1 = "Set 1", key2 = "Set 2";
+
+    let key1 = "Set 1",
+      key2 = "Set 2";
     if (plant && !inverter && !mppt && !string) {
       key1 = `Plant 1 - ${plant}`;
       key2 = `Plant 2 - ${plant1}`;
@@ -218,81 +236,83 @@ export class HealthService {
       key1 = `String 1 - ${string}`;
       key2 = `String 2 - ${string1}`;
     }
-  
+
     const response = {
-      [key1]: results_set1.map(result => ({
+      [key1]: results_set1.map((result) => ({
         date: result._id,
         hourly_values: result.hourly_values,
       })),
-      [key2]: results_set2.map(result => ({
+      [key2]: results_set2.map((result) => ({
         date: result._id,
         hourly_values: result.hourly_values,
       })),
     };
-  
+
     return response;
   }
 
-  async getRadiationIntensityInter(dto: RadiationIntensityInterDto): Promise<any> {
+  async getRadiationIntensityInter(
+    dto: RadiationIntensityInterDto
+  ): Promise<any> {
     const { date, stationCode1, stationCode2, option } = dto;
-  
+
     // Station label mapping
     const stationLabelMap = {
-      [stationCode1]: 'Plant 1 - Coca Cola Faisalabad',
-      [stationCode2]: 'Plant 2 - Coca Cola Faisalabad',
+      [stationCode1]: "Plant 1 - Coca Cola Faisalabad",
+      [stationCode2]: "Plant 2 - Coca Cola Faisalabad",
     };
-  
+
     // Default 24-hour structure
     const defaultHourlyValues = Array.from({ length: 24 }, (_, hour) => ({
       hour,
       value: 0,
     }));
-  
+
     // Build MongoDB query
     const query = {
       stationCode: { $in: [stationCode1, stationCode2] },
       timestamp: { $regex: `^${date}` },
     };
-  
+
     // Projection
     const projection: any = {
       timestamp: 1,
       stationCode: 1,
       _id: 0,
     };
-  
+
     if (option === 1) {
-      projection['dataItemMap.radiation_intensity'] = 1;
+      projection["dataItemMap.radiation_intensity"] = 1;
     } else if (option === 2) {
-      projection['dataItemMap.inverter_power'] = 1;
+      projection["dataItemMap.inverter_power"] = 1;
     }
-  
+
     // Fetch from MongoDB
     const results = await this.radiationModel.find(query, projection).lean();
-  
+
     // Prepare grouped data
     const groupedData: Record<string, { hour: number; value: number }[]> = {
       [stationCode1]: [...defaultHourlyValues],
       [stationCode2]: [...defaultHourlyValues],
     };
-  
+
     for (const result of results) {
       const stationCode = result.stationCode;
-      const timestamp = moment(result.timestamp, 'YYYY-MM-DD HH:mm:ss');
+      const timestamp = moment(result.timestamp, "YYYY-MM-DD HH:mm:ss");
       const hour = timestamp.hour();
-  
+
       let value = 0;
       if (option === 1) {
         value = result.dataItemMap?.radiation_intensity ?? 0;
       } else if (option === 2) {
         value = result.dataItemMap?.inverter_power ?? 0;
       }
-  
+
       if (stationCode in groupedData) {
         groupedData[stationCode][hour].value = value;
       }
     }
-  
+
     // Final output
     return [
       {
@@ -307,5 +327,72 @@ export class HealthService {
       },
     ];
   }
-  
+
+  async getTemperatureData(dto: TemperatureDto) {
+    const { start_date, end_date, plant, option, tag } = dto;
+    // Validate input dates
+    const startDate = start_date
+      ? moment(start_date).format("YYYY-MM-DD")
+      : moment().format("YYYY-MM-DD");
+    const endDate = end_date
+      ? moment(end_date).format("YYYY-MM-DD")
+      : moment().format("YYYY-MM-DD");
+    // Determine the field to query based on the tag
+    const field = tag == 1 ? "temperature" : "efficiency";
+
+    // Querying the database
+    const query = {
+      Plant: plant,
+      Day_Hour: {
+        $gte: startDate,
+        $lte: endDate,
+      },
+    };
+    const cursor = await this.gtHourlyModel.find(query).lean().exec();
+    // console.log(cursor);
+
+    // Processing the data
+    const groupedData: Record<string, any> = {};
+    for (const record of cursor) {
+      const { Day_Hour, sn } = record;
+      const value = record[field];
+      console.log("Field:", field);
+      console.log("Available Keys:", Object.keys(record));
+      console.log(`Value of ${field}:`, record[field]);
+
+      const [datePart] = Day_Hour.split(" ");
+
+      if (option === 1) {
+        groupedData[sn] = groupedData[sn] || {};
+        groupedData[sn][Day_Hour] = value;
+      } else if (option === 2) {
+        groupedData[sn] = groupedData[sn] || {};
+        groupedData[sn][datePart] = groupedData[sn][datePart] || [];
+        groupedData[sn][datePart].push(value);
+      }
+    }
+
+    // Average calculation for option 2
+    if (option === 2) {
+      // Calculate average for each date
+      Object.keys(groupedData).forEach((sn) => {
+        Object.keys(groupedData[sn]).forEach((date) => {
+          const values = groupedData[sn][date];
+          groupedData[sn][date] =
+            values.reduce((sum, value) => sum + value, 0) / values.length;
+        });
+      });
+    }
+
+    // Format the response
+    return Object.entries(groupedData).map(([sn, data]) => ({
+      sn,
+      data: Object.entries(data as Record<string, number>).map(
+        ([category, value]) => ({
+          category,
+          value: value ?? 0, // ✅ Fallback to 0 if undefined/null
+        })
+      ),
+    }));
+  }
 }

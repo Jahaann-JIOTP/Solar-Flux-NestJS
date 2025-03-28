@@ -1,7 +1,7 @@
-import { Schema, Prop, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Schema, Prop, SchemaFactory } from "@nestjs/mongoose";
+import { Document } from "mongoose";
 
-@Schema({ collection: 'String_Hour' })
+@Schema({ collection: "String_Hour" })
 export class StringHour extends Document {
   @Prop({ required: true })
   Day_Hour: string;
@@ -20,6 +20,10 @@ export class StringHour extends Document {
 
   @Prop()
   P_abd: number;
+  @Prop()
+  i?: number; // ✅ Added Current
+  @Prop()
+  u?: number; // ✅ Added Voltage
 }
 
 export const StringHourSchema = SchemaFactory.createForClass(StringHour);

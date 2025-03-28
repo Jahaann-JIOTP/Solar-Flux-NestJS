@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsIn } from "class-validator";
 
 export class GetHourlyValuesDto {
   @IsNotEmpty()
@@ -24,4 +24,9 @@ export class GetHourlyValuesDto {
   @IsOptional()
   @IsString()
   string?: string;
+  @IsString()
+  @IsIn(["power", "current", "voltage"], {
+    message: "Invalid option. Choose from: power, current, voltage",
+  })
+  option: string;
 }
