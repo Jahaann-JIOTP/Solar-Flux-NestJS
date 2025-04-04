@@ -13,6 +13,7 @@ import { ProductionModule } from './production/production.module';
 import { AnalysisModule } from './analysis/analysis.module';
 import { SolaranalyticsModule } from './solaranalytics/solaranalytics.module';
 import { HealthModule } from './health/health.module';
+import { PoweranalyticsModule } from './poweranalytics/poweranalytics.module';
 
 
 
@@ -35,7 +36,7 @@ import { HealthModule } from './health/health.module';
       RolesModule,
       AuthModule, 
       DashboardModule, 
-      SldModule, ProductionModule, SolaranalyticsModule, HealthModule,
+      SldModule, ProductionModule, SolaranalyticsModule, HealthModule, PoweranalyticsModule,
     ],
   })
   export class AppModule {}
