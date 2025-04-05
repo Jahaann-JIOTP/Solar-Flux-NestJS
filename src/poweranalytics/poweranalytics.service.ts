@@ -8,7 +8,11 @@ import { CalculatePowerDayDto } from "./dto/active_power_day.dto";
 import { CalculatePowerWeekDto } from "./dto/active_power_weekday.dto";
 import { CalculateActivePowerWeek1Dto } from "./dto/calculate_active_power_week1.dto";
 import { CalculateActivePowerHourWeek1Dto } from "./dto/active_power_hour_week1.dto";
+import { ActivePeakPowerDto } from "./dto/active-peak-power.dto";
+import { ActivePowerWeekdayDto } from './dto/active_power_monday.dto';
 import { PipelineStage } from "mongoose";
+import * as moment from "moment";
+
 
 @Injectable()
 export class PowerService {
@@ -545,4 +549,250 @@ export class PowerService {
       throw new Error(`Aggregation Error: ${error.message}`);
     }
   }
+  // Tab 3rd  PEAK HOUR
+  async getActivePeakPower(dto: ActivePeakPowerDto): Promise<any> {
+    try {
+      const { start_date, end_date, plant } = dto;
+
+      const pipeline: PipelineStage[] = [
+        {
+          $match: {
+            Day: { $gte: start_date, $lte: end_date },
+            Plant: plant,
+          },
+        },
+        {
+          $addFields: {
+            hour: {
+              $arrayElemAt: [{ $split: ["$Day_Hour", " "] }, 1],
+            },
+          },
+        },
+        { $sort: { active_power: -1 as const } }, // sort descending to get peak
+        {
+          $group: {
+            _id: "$Day",
+            max_active_power: { $first: "$active_power" },
+            hour_with_max_power: { $first: "$hour" },
+          },
+        },
+        { $sort: { _id: 1 as const } },
+      ];
+      
+      const results = await this.gmHourlyModel.aggregate(pipeline);
+
+      return {
+        data: results.map((result) => ({
+          date: result._id, // ✅ _id is your date now
+          hour: result.hour_with_max_power?.padStart(2, "0") || "--",
+          max_active_power: result.max_active_power
+            ? Math.round(result.max_active_power * 100) / 100
+            : 0,
+        })),
+      };
+    } catch (error) {
+      throw new Error(`Aggregation Error: ${error.message}`);
+    }
+  }
+// Tab 3rd  HOURLY COMPARISON
+async getActivePowerHourlyComparison(dto: ActivePeakPowerDto) {
+  const { start_date, end_date, plant } = dto;
+
+  const formattedStart = moment(start_date, 'YYYY-MM-DD').format('YYYY-MM-DD');
+  const formattedEnd = moment(end_date, 'YYYY-MM-DD').format('YYYY-MM-DD');
+
+  const query = {
+    $or: [
+      { Day_Hour: { $regex: `^${formattedStart}` } },
+      { Day_Hour: { $regex: `^${formattedEnd}` } },
+    ],
+    Plant: plant,
+  };
+
+  const pipeline: PipelineStage[] = [
+    { $match: query },
+    {
+      $group: {
+        _id: {
+          date: { $substr: ['$Day_Hour', 0, 10] },
+          hour: { $toInt: { $substr: ['$Day_Hour', 11, 2] } },
+        },
+        avg_u: { $sum: '$active_power' },
+      },
+    },
+    {
+      $group: {
+        _id: '$_id.date',
+        hourly_values: {
+          $push: {
+            hour: '$_id.hour',
+            value: '$avg_u',
+          },
+        },
+      },
+    },
+    {
+      $sort: { _id: 1 as const },
+    },
+  ];
+
+  const results = await this.gmHourlyModel.aggregate(pipeline);
+
+  return results.map((result) => ({
+    date: result._id,
+    hourly_values: result.hourly_values,
+  }));
+}
+// Tab 3rd  LAST VS BUSIEST WEEKDAY
+async getActivePowerByWeekday(dto: ActivePowerWeekdayDto) {
+  const { start_date, end_date, plant, weekday } = dto;
+
+  const weekdayMap = {
+    "Monday": 0,
+    "Tuesday": 1,
+    "Wednesday": 2,
+    "Thursday": 3,
+    "Friday": 4,
+    "Saturday": 5,
+    "Sunday": 6
+}
+
+  if (!(weekday in weekdayMap)) {
+    throw new Error('Invalid weekday specified');
+  }
+
+  const weekdayNumber = weekdayMap[weekday];
+
+  const query = {
+    Day_Hour: {
+      $gte: `${start_date} 00`,
+      $lte: `${end_date} 23`,
+    },
+    Plant: plant,
+  };
+
+  const pipeline: PipelineStage[] = [
+    { $match: query },
+    {
+      $group: {
+        _id: {
+          date: { $substr: ['$Day_Hour', 0, 10] },
+          hour: { $toInt: { $substr: ['$Day_Hour', 11, 2] } },
+        },
+        avg_u: { $sum: '$active_power' },
+      },
+    },
+    {
+      $group: {
+        _id: '$_id.date',
+        hourly_values: {
+          $push: {
+            hour: '$_id.hour',
+            value: '$avg_u',
+          },
+        },
+        total_power: { $sum: '$avg_u' },
+      },
+    },
+    { $sort: { _id: 1 as const } },
+  ];
+
+  const results = await this.gmHourlyModel.aggregate(pipeline);
+
+  const weekdayResults = results
+    .filter((res) => moment(res._id, 'YYYY-MM-DD').weekday() === (weekdayNumber + 1))
+    .map((res) => ({
+      date: res._id,
+      hourly_values: res.hourly_values,
+      total_power: res.total_power,
+    }));
+
+  if (weekdayResults.length === 0) {
+    return [];
+  }
+
+  const lastWeekday = weekdayResults[weekdayResults.length - 1];
+  const busiestWeekday = weekdayResults.reduce((prev, current) =>
+    current.total_power > prev.total_power ? current : prev,
+  );
+
+  return [
+    {
+      description: `Last ${weekday} (${lastWeekday.date})`,
+      date: lastWeekday.date,
+      hourly_values: lastWeekday.hourly_values,
+    },
+    {
+      description: `Busy ${weekday} (${busiestWeekday.date})`,
+      date: busiestWeekday.date,
+      hourly_values: busiestWeekday.hourly_values,
+    },
+  ];
+}
+
+async getActivePowerByWeekend(dto: ActivePowerWeekdayDto) {
+  const { start_date, end_date, plant, weekday: weekdayName } = dto;
+
+  const weekdayMap = {
+    Monday: 1,
+    Tuesday: 2,
+    Wednesday: 3,
+    Thursday: 4,
+    Friday: 5,
+    Saturday: 6,
+    Sunday: 7,
+  };
+
+  if (!(weekdayName in weekdayMap)) {
+    throw new Error('Invalid weekday specified');
+  }
+
+  const weekdayNumber = weekdayMap[weekdayName];
+
+  const query = {
+    Day_Hour: {
+      $gte: `${start_date} 00`,
+      $lte: `${end_date} 23`,
+    },
+    Plant: plant,
+  };
+
+  const pipeline: PipelineStage[] = [
+    { $match: query },
+    {
+      $group: {
+        _id: {
+          date: { $substr: ['$Day_Hour', 0, 10] },
+          hour: { $toInt: { $substr: ['$Day_Hour', 11, 2] } },
+        },
+        avg_u: { $sum: '$active_power' },
+      },
+    },
+    {
+      $group: {
+        _id: '$_id.date',
+        hourly_values: {
+          $push: {
+            hour: '$_id.hour',
+            value: '$avg_u',
+          },
+        },
+        total_power: { $sum: '$avg_u' },
+      },
+    },
+    { $sort: { _id: 1 as const } },
+  ];
+
+  const results = await this.gmHourlyModel.aggregate(pipeline);
+
+  const filteredResults = results
+    .filter((res) => moment(res._id, 'YYYY-MM-DD').isoWeekday() === weekdayNumber)
+    .map((entry) => ({
+      description: `${weekdayName} (${entry._id})`,
+      date: entry._id,
+      hourly_values: entry.hourly_values,
+    }));
+
+  return filteredResults;
+}
 }

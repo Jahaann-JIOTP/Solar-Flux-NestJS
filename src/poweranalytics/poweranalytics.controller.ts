@@ -5,6 +5,8 @@ import { CalculatePowerDayDto } from './dto/active_power_day.dto';
 import { CalculatePowerWeekDto } from './dto/active_power_weekday.dto';
 import { CalculateActivePowerWeek1Dto } from './dto/calculate_active_power_week1.dto';
 import { CalculateActivePowerHourWeek1Dto } from './dto/active_power_hour_week1.dto';
+import { ActivePeakPowerDto } from './dto/active-peak-power.dto';
+import { ActivePowerWeekdayDto } from './dto/active_power_monday.dto';
 
 @Controller('power')
 export class PowerController {
@@ -37,4 +39,23 @@ export class PowerController {
   async calculateActivePowerHourWeek1(@Body() dto: CalculateActivePowerHourWeek1Dto) {
     return this.powerService.calculateActivePowerHourWeek1(dto);
   }
+    // 2nd Tab Weekly End
+
+    // 3rd Tab Hourly Start
+    @Post('active_peak_power')
+    async getActivePeakPower(@Body() dto: ActivePeakPowerDto) {
+      return this.powerService.getActivePeakPower(dto);
+    }
+    @Post('active_power_hourly_values')
+    async getActivePowerHourlyComparison(@Body() dto: ActivePeakPowerDto) {
+      return this.powerService.getActivePowerHourlyComparison(dto);
+    }
+    @Post('active_power_monday_values')
+    async getActivePowerByWeekday(@Body() dto: ActivePowerWeekdayDto) {
+      return this.powerService.getActivePowerByWeekday(dto);
+    }
+    @Post('active_power_weekday_values')
+    async getActivePowerByWeekend(@Body() dto: ActivePowerWeekdayDto) {
+      return this.powerService.getActivePowerByWeekend(dto);
+    }
 }
