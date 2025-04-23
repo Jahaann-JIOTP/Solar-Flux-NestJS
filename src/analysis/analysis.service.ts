@@ -457,7 +457,7 @@ if (resolution === ResolutionType.Weekly) {
             sn: inverter,
             mppt: mppt
           },
-          value1: attribute === AttributeType.Current
+          value1: attribute === AttributeType.Power
             ? { $sum: selectedWeeklyAttribute }
             : { $avg: selectedWeeklyAttribute }
         }
@@ -504,7 +504,7 @@ if (resolution === ResolutionType.Weekly) {
             sn: inverter,
             mppt: "$MPPT"
           },
-          value1: attribute === AttributeType.Current
+          value1: attribute === AttributeType.Power
             ? { $sum: selectedWeeklyAttribute }
             : { $avg: selectedWeeklyAttribute }
         }
@@ -548,7 +548,7 @@ if (resolution === ResolutionType.Weekly) {
             week: "$week",
             sn: "$sn"
           },
-          value1: attribute === AttributeType.Current
+          value1: attribute === AttributeType.Power
             ? { $sum: selectedWeeklyAttribute }
             : { $avg: selectedWeeklyAttribute }
         }
@@ -621,7 +621,7 @@ if (resolution === ResolutionType.Monthly) {
             sn: inverter,
             mppt: mppt
           },
-          value1: attribute === AttributeType.Current
+          value1: attribute === AttributeType.Power
             ? { $sum: selectedMonthlyAttribute }
             : { $avg: selectedMonthlyAttribute }
         }
@@ -668,7 +668,7 @@ if (resolution === ResolutionType.Monthly) {
             sn: inverter,
             mppt: "$MPPT"
           },
-          value1: attribute === AttributeType.Current
+          value1: attribute === AttributeType.Power
             ? { $sum: selectedMonthlyAttribute }
             : { $avg: selectedMonthlyAttribute }
         }
@@ -712,7 +712,7 @@ if (resolution === ResolutionType.Monthly) {
             month: "$month",
             sn: "$sn"
           },
-          value1: attribute === AttributeType.Current
+          value1: attribute === AttributeType.Power
             ? { $sum: selectedMonthlyAttribute }
             : { $avg: selectedMonthlyAttribute }
         }
@@ -795,7 +795,7 @@ if (resolution === ResolutionType.Quarter) {
             sn: inverter,
             mppt: mppt
           },
-          value1: attribute === AttributeType.Current
+          value1: attribute === AttributeType.Power
             ? { $sum: selectedQuarterlyAttribute }
             : { $avg: selectedQuarterlyAttribute }
         }
@@ -852,7 +852,7 @@ if (resolution === ResolutionType.Quarter) {
             sn: inverter,
             mppt: "$MPPT"
           },
-          value1: attribute === AttributeType.Current
+          value1: attribute === AttributeType.Power
             ? { $sum: selectedQuarterlyAttribute }
             : { $avg: selectedQuarterlyAttribute }
         }
@@ -906,7 +906,7 @@ if (resolution === ResolutionType.Quarter) {
             quarter: "$quarter",
             sn: "$sn"
           },
-          value1: attribute === AttributeType.Current
+          value1: attribute === AttributeType.Power
             ? { $sum: selectedQuarterlyAttribute }
             : { $avg: selectedQuarterlyAttribute }
         }
@@ -988,7 +988,7 @@ if (resolution === ResolutionType.HalfYearly) {
             sn: inverter,
             mppt: mppt
           },
-          value1: attribute === AttributeType.Current
+          value1: attribute === AttributeType.Power
             ? { $sum: selectedHalfYearlyAttribute }
             : { $avg: selectedHalfYearlyAttribute }
         }
@@ -1046,7 +1046,7 @@ if (resolution === ResolutionType.HalfYearly) {
             sn: inverter,
             mppt: "$MPPT"
           },
-          value1: attribute === AttributeType.Current
+          value1: attribute === AttributeType.Power
             ? { $sum: selectedHalfYearlyAttribute }
             : { $avg: selectedHalfYearlyAttribute }
         }
@@ -1101,7 +1101,7 @@ if (resolution === ResolutionType.HalfYearly) {
             half: "$half",
             sn: "$sn"
           },
-          value1: attribute === AttributeType.Current
+          value1: attribute === AttributeType.Power
             ? { $sum: selectedHalfYearlyAttribute }
             : { $avg: selectedHalfYearlyAttribute }
         }
@@ -1181,7 +1181,7 @@ if (resolution === ResolutionType.Yearly) {
             sn: inverter,
             mppt: mppt
           },
-          value1: attribute === AttributeType.Current
+          value1: attribute === AttributeType.Power
             ? { $sum: selectedYearlyAttribute }
             : { $avg: selectedYearlyAttribute }
         }
@@ -1228,7 +1228,7 @@ if (resolution === ResolutionType.Yearly) {
             sn: inverter,
             mppt: "$MPPT"
           },
-          value1: attribute === AttributeType.Current
+          value1: attribute === AttributeType.Power
             ? { $sum: selectedYearlyAttribute }
             : { $avg: selectedYearlyAttribute }
         }
@@ -1272,7 +1272,7 @@ if (resolution === ResolutionType.Yearly) {
             year: "$year",
             sn: "$sn"
           },
-          value1: attribute === AttributeType.Current
+          value1: attribute === AttributeType.Power
             ? { $sum: selectedYearlyAttribute }
             : { $avg: selectedYearlyAttribute }
         }
