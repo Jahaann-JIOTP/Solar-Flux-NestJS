@@ -215,7 +215,26 @@ export class SolarAnalyticsService {
           option === 2
             ? { $concat: ["Week ", "$_id.date"] }
             : option === 3
-            ? { $concat: ["Month ", "$_id.date"] }
+            ? {
+                $arrayElemAt: [
+                  [
+                    "",
+                    "January",
+                    "February",
+                    "March",
+                    "April",
+                    "May",
+                    "June",
+                    "July",
+                    "August",
+                    "September",
+                    "October",
+                    "November",
+                    "December"
+                  ],
+                  { $toInt: "$_id.date" }
+                ]
+              }
             : "$_id.date",
         year: option === 3 ? "$_id.year" : null,
         plant: "$_id.plant",
@@ -226,6 +245,7 @@ export class SolarAnalyticsService {
         P_abd: "$total_P_abd",
       },
     };
+    
 
     const pipeline = [matchStage, groupStage, projectStage];
     return this.StringDayModel.aggregate(pipeline);

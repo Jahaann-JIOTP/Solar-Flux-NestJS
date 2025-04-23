@@ -196,7 +196,7 @@ export class SldService {
               }<br> Capacity: ${(item as any).watt_string} W`;
               mpptData.children.push(item);
               mpptData[tag] =
-                tag === "u"
+                tag === "u" || tag === "i"
                   ? Math.round(
                       mpptData.children.reduce(
                         (sum, child) => sum + (child as any)[tag],
@@ -220,7 +220,7 @@ export class SldService {
 
             snData.children.push(mpptData);
             snData[tag] =
-              tag === "u"
+              tag === "u" || tag === "i"
                 ? Math.round(
                     snData.children.reduce(
                       (sum, child) => sum + (child as any)[tag],
@@ -244,7 +244,7 @@ export class SldService {
 
           plantData.children.push(snData);
           plantData[tag] =
-            tag === "u"
+             tag === "u" || tag === "i"
               ? Math.round(
                   plantData.children.reduce(
                     (sum, child) => sum + (child as any)[tag],
