@@ -15,6 +15,6 @@ app.enableCors({
   credentials: true, // Allow cookies & auth headers
 });
 
-  await app.listen(process.env.PORT ?? 5002);
+  await app.listen(process.env.PORT ?? 3195);
 }
 bootstrap();
