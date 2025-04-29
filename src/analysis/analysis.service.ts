@@ -323,7 +323,7 @@ if (resolution === ResolutionType.Daily) {
             sn: inverter,
             mppt: mppt
           },
-          value1: { $avg: selectedDailyAttribute }
+          value1: { $sum: selectedDailyAttribute }
         }
       },
       {
@@ -356,7 +356,7 @@ if (resolution === ResolutionType.Daily) {
             Plant: plant,
             sn: inverter
           },
-          value1: { $avg: selectedDailyAttribute }
+          value1: { $sum: selectedDailyAttribute }
         }
       },
       {
@@ -386,7 +386,7 @@ if (resolution === ResolutionType.Daily) {
             timestamp: "$Day",
             sn: "$sn"
           },
-          value1: { $avg: selectedDailyAttribute }
+          value1: { $sum: selectedDailyAttribute }
         }
       },
       {

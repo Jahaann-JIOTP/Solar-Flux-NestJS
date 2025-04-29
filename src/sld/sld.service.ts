@@ -14,34 +14,23 @@ export class SldService {
     @InjectModel(GTHourly.name) private gtHourlyModel: Model<GTHourly>
   ) {}
 
-  async getOrgChartData(plant: string, option: string, targetDate?: string) {
+  async getOrgChartData(plant: string, options: string[], targetDate?: string) {
     try {
-      // 🔹 **Option to Tag Mapping**
       const optionToTagMap = {
         current: "i",
         power: "P_abd",
         voltage: "u",
       };
-
-      const tag = optionToTagMap[option];
-      if (!tag) throw new Error("Invalid option");
-
-      // ✅ **Filter By Selected Plant**
-      const plants = plant
-        ? [plant]
-        : await this.overallDataModel.distinct("dataItemMap.Plant");
-
-      targetDate = targetDate
-        ? moment(targetDate).format("YYYY-MM-DD")
-        : moment().format("YYYY-MM-DD");
-
-      // Aggregate query to get average temperature by sn and Day_Hour
+  
+      const tags = options.map((opt) => optionToTagMap[opt]);
+      if (tags.includes(undefined)) throw new Error("Invalid option selected");
+  
+      const plants = plant ? [plant] : await this.overallDataModel.distinct("dataItemMap.Plant");
+  
+      targetDate = targetDate ? moment(targetDate).format("YYYY-MM-DD") : moment().format("YYYY-MM-DD");
+  
       const avgTemperatures = await this.gtHourlyModel.aggregate([
-        {
-          $match: {
-            Day_Hour: { $regex: `^${targetDate}` },
-          },
-        },
+        { $match: { Day_Hour: { $regex: `^${targetDate}` } } },
         {
           $group: {
             _id: { sn: "$sn", Day_Hour: { $substr: ["$Day_Hour", 0, 10] } },
@@ -49,230 +38,180 @@ export class SldService {
           },
         },
       ]);
-
+  
       const avgTempDict = avgTemperatures.reduce((acc, item) => {
-        acc[`${item._id.sn}_${item._id.Day_Hour}`] =
-          Math.round(item.average_temp * 100) / 100; // ✅ 2 decimal places round off
+        acc[`${item._id.sn}_${item._id.Day_Hour}`] = Math.round(item.average_temp * 100) / 100;
         return acc;
       }, {});
-
+  
       const orgChart: any[] = [];
-
+  
       for (const plantName of plants) {
-        const plantData: {
-          name: string;
-          title: string;
-          image: string;
-          children: any[]; // 🔹 FIX: Explicitly set as an array of objects
-          [key: string]: any;
-        } = {
+        const plantData: any = {
           name: plantName,
-          title: `${
-            tag === "u"
-              ? "Voltage: 0 V"
-              : tag === "i"
-              ? "Current: 0 A"
-              : "Power: 0 KW"
-          }`,
+          title: "",
           image: "/assets/images/plant.png",
-          children: [], // ✅ Now TypeScript knows this is an array
-          [tag]: 0,
+          children: [],
         };
-
-        const snList = await this.overallDataModel.distinct("dataItemMap.sn", {
-          "dataItemMap.Plant": plantName, // ✅ **Filter by Selected Plant**
+  
+        tags.forEach(tag => {
+          plantData[tag] = 0;
+          if (tag === "u" || tag === "i") plantData[`${tag}_count`] = 0;
         });
-
+  
+        const snList = await this.overallDataModel.distinct("dataItemMap.sn", { "dataItemMap.Plant": plantName });
+  
         for (const sn of snList) {
-          const snData: {
-            name: string;
-            title: string;
-            image: string;
-            children: any[];
-            [key: string]: any;
-          } = {
+          const snData: any = {
             name: sn,
-            title: `${
-              tag === "u"
-                ? "Voltage: 0 V"
-                : tag === "i"
-                ? "Current: 0 A"
-                : "Power: 0 KW"
-            }`,
+            title: "",
             image: "/assets/images/inv.png",
             children: [],
-            [tag]: 0,
             avg_temp: avgTempDict[`${sn}_${targetDate}`] || 0,
           };
-
+  
+          tags.forEach(tag => {
+            snData[tag] = 0;
+            if (tag === "u" || tag === "i") snData[`${tag}_count`] = 0;
+          });
+  
           const wattStringInfo = await this.sumWattString(sn);
           snData["inverter"] = wattStringInfo.totalWattString / 1000;
-          snData.title = `${
-            tag === "u" ? "Voltage" : tag === "i" ? "Current" : "Power"
-          }: ${snData[tag]} ${
-            tag === "u" ? "V" : tag === "i" ? "A" : "KW"
-          }<br> Avg Temp: ${snData.avg_temp}°C`;
-
-          const mpptList = await this.overallDataModel.distinct(
-            "dataItemMap.MPPT",
-            {
-              "dataItemMap.sn": sn,
-            }
-          );
-
+  
+          const mpptList = await this.overallDataModel.distinct("dataItemMap.MPPT", { "dataItemMap.sn": sn });
+  
           for (const mppt of mpptList) {
-            const mpptData: {
-              name: string;
-              title: string;
-              image: string;
-              children: any[];
-              [key: string]: any;
-            } = {
+            const mpptData: any = {
               name: mppt,
-              title: `${
-                tag === "u"
-                  ? "Voltage: 0 V"
-                  : tag === "i"
-                  ? "Current: 0 A"
-                  : "Power: 0 KW"
-              }`,
+              title: "",
               image: "/assets/images/mppt.png",
               children: [],
-              [tag]: 0,
             };
-
-            // ✅ **Fetching Data for Requested Plant & Option**
-            const projection = {
+  
+            tags.forEach(tag => {
+              mpptData[tag] = 0;
+              if (tag === "u" || tag === "i") mpptData[`${tag}_count`] = 0;
+            });
+  
+            const projection: any = {
               "dataItemMap.Strings": 1,
               "dataItemMap.Watt/String": 1,
               timestamp: 1,
             };
-            projection[`dataItemMap.${tag}`] = 1;
-
-            const stringDocs = await this.overallDataModel.find(
-              {
-                "dataItemMap.MPPT": mppt,
-                "dataItemMap.sn": sn,
-                "dataItemMap.Plant": plantName, // ✅ **Filter by Plant**
-              },
-              projection
-            );
-
-            const stringsData = {};
+            tags.forEach(tag => projection[`dataItemMap.${tag}`] = 1);
+  
+            const stringDocs = await this.overallDataModel.find({
+              "dataItemMap.MPPT": mppt,
+              "dataItemMap.sn": sn,
+              "dataItemMap.Plant": plantName,
+            }, projection);
+  
+            const stringsData: any = {};
             for (const doc of stringDocs) {
               const stringName = doc.dataItemMap.Strings;
               const wattString = doc.dataItemMap["Watt/String"];
               const timestamp = doc.timestamp;
-
+  
               if (!stringsData[stringName]) {
                 stringsData[stringName] = {
                   name: stringName,
-                  title: `${
-                    tag === "u"
-                      ? "Voltage: 0 V"
-                      : tag === "i"
-                      ? "Current: 0 A"
-                      : "Power: 0 KW"
-                  }`,
+                  title: "",
                   image: "/assets/images/solar-mon.png",
                   watt_string: wattString,
-                  [tag]: 0,
                 };
+                tags.forEach(tag => stringsData[stringName][tag] = 0);
               }
-
-              if (
-                new Date(timestamp).toISOString().split("T")[0] === targetDate
-              ) {
-                stringsData[stringName][tag] += doc.dataItemMap?.[tag] || 0;
+  
+              if (new Date(timestamp).toISOString().split("T")[0] === targetDate) {
+                tags.forEach(tag => {
+                  stringsData[stringName][tag] += doc.dataItemMap?.[tag] || 0;
+                });
               }
             }
-
+  
             for (const item of Object.values(stringsData)) {
-              (item as any)[tag] = Math.round((item as any)[tag] || 0);
-              (item as any).title = `${
-                tag === "u" ? "Voltage" : tag === "i" ? "Current" : "Power"
-              }: ${(item as any)[tag]} ${
-                tag === "u" ? "V" : tag === "i" ? "A" : "KW"
-              }<br> Capacity: ${(item as any).watt_string} W`;
+              const isSunHours = tags.some(tag => tag !== "P_abd" && (item as any)[tag] > 0);
+              if (!isSunHours) continue;
+  
+              tags.forEach(tag => {
+                (item as any)[tag] = Math.round((item as any)[tag] || 0);
+              });
+  
+              (item as any).title = tags.map(tag => `${tag === "u" ? "Voltage" : tag === "i" ? "Current" : "Power"}: ${(item as any)[tag]} ${tag === "u" ? "V" : tag === "i" ? "A" : "KW"}`).join("<br>") + `<br>Capacity: ${(item as any).watt_string} W`;
+  
               mpptData.children.push(item);
-              mpptData[tag] =
-                tag === "u" || tag === "i"
-                  ? Math.round(
-                      mpptData.children.reduce(
-                        (sum, child) => sum + (child as any)[tag],
-                        0
-                      ) / mpptData.children.length
-                    )
-                  : Math.round(
-                      mpptData.children.reduce(
-                        (sum, child) => sum + (child as any)[tag],
-                        0
-                      )
-                    );
+  
+              tags.forEach(tag => {
+                if ((item as any)[tag] > 0) {
+                  mpptData[tag] += (item as any)[tag];
+                  if (tag === "u" || tag === "i") mpptData[`${tag}_count`] += 1;
+                }
+              });
             }
-
-            mpptData[tag] = Math.round(mpptData[tag] || 0);
-            mpptData.title = `${
-              tag === "u" ? "Voltage" : tag === "i" ? "Current" : "Power"
-            }: ${mpptData[tag]} ${
-              tag === "u" ? "V" : tag === "i" ? "A" : "KW"
-            }`;
-
+  
+            tags.forEach(tag => {
+              if (tag === "u" || tag === "i") {
+                if (mpptData[`${tag}_count`] > 0) mpptData[tag] = Math.round(mpptData[tag] / mpptData[`${tag}_count`]);
+              }
+              mpptData[tag] = Math.round(mpptData[tag] || 0);
+            });
+            tags.forEach(tag => delete mpptData[`${tag}_count`]);
+  
+            mpptData.title = tags.map(tag => `${tag === "u" ? "Voltage" : tag === "i" ? "Current" : "Power"}: ${mpptData[tag]} ${tag === "u" ? "V" : tag === "i" ? "A" : "KW"}`).join("<br>");
+  
             snData.children.push(mpptData);
-            snData[tag] =
-              tag === "u" || tag === "i"
-                ? Math.round(
-                    snData.children.reduce(
-                      (sum, child) => sum + (child as any)[tag],
-                      0
-                    ) / snData.children.length
-                  )
-                : Math.round(
-                    snData.children.reduce(
-                      (sum, child) => sum + (child as any)[tag],
-                      0
-                    )
-                  );
+  
+            tags.forEach(tag => {
+              if (mpptData[tag] > 0) {
+                snData[tag] += mpptData[tag];
+                if (tag === "u" || tag === "i") snData[`${tag}_count`] += 1;
+              }
+            });
           }
-
-          snData[tag] = Math.round(snData[tag] || 0);
-          snData.title = `${
-            tag === "u" ? "Voltage" : tag === "i" ? "Current" : "Power"
-          }: ${snData[tag]} ${
-            tag === "u" ? "V" : tag === "i" ? "A" : "KW"
-          }<br> Avg Temp: ${snData.avg_temp}°C`;
-
+  
+          tags.forEach(tag => {
+            if (tag === "u" || tag === "i") {
+              if (snData[`${tag}_count`] > 0) snData[tag] = Math.round(snData[tag] / snData[`${tag}_count`]);
+            }
+            snData[tag] = Math.round(snData[tag] || 0);
+          });
+          tags.forEach(tag => delete snData[`${tag}_count`]);
+  
+          snData.title = tags.map(tag => `${tag === "u" ? "Voltage" : tag === "i" ? "Current" : "Power"}: ${snData[tag]} ${tag === "u" ? "V" : tag === "i" ? "A" : "KW"}`).join("<br>") + `<br>Avg Temp: ${snData.avg_temp}°C`;
+  
           plantData.children.push(snData);
-          plantData[tag] =
-             tag === "u" || tag === "i"
-              ? Math.round(
-                  plantData.children.reduce(
-                    (sum, child) => sum + (child as any)[tag],
-                    0
-                  ) / plantData.children.length
-                )
-              : Math.round(
-                  plantData.children.reduce(
-                    (sum, child) => sum + (child as any)[tag],
-                    0
-                  )
-                );
+  
+          tags.forEach(tag => {
+            if (snData[tag] > 0) {
+              plantData[tag] += snData[tag];
+              if (tag === "u" || tag === "i") plantData[`${tag}_count`] += 1;
+            }
+          });
         }
-
-        plantData[tag] = Math.round(plantData[tag] || 0);
-        plantData.title = `${
-          tag === "u" ? "Voltage" : tag === "i" ? "Current" : "Power"
-        }: ${plantData[tag]} ${tag === "u" ? "V" : tag === "i" ? "A" : "KW"}`;
-
+  
+        tags.forEach(tag => {
+          if (tag === "u" || tag === "i") {
+            if (plantData[`${tag}_count`] > 0) plantData[tag] = Math.round(plantData[tag] / plantData[`${tag}_count`]);
+          }
+          plantData[tag] = Math.round(plantData[tag] || 0);
+        });
+        tags.forEach(tag => delete plantData[`${tag}_count`]);
+  
+        plantData.title = tags.map(tag => `${tag === "u" ? "Voltage" : tag === "i" ? "Current" : "Power"}: ${plantData[tag]} ${tag === "u" ? "V" : tag === "i" ? "A" : "KW"}`).join("<br>");
+  
         orgChart.push(plantData);
       }
-
+  
       return { status: "success", data: orgChart };
     } catch (error) {
       this.logger.error(error.message);
       return { status: "error", message: error.message };
     }
   }
+  
+  
+  
+  
 
   async sumWattString(sn: string) {
     return { totalWattString: 50000 }; // Dummy function, replace with actual logic
