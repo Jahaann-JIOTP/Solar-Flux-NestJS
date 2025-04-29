@@ -145,7 +145,7 @@ export class PowerService {
   async calculateActivePowerDay(payload: CalculatePowerDayDto) {
     try {
       const { start_date, end_date, tarrif, option = 1, plant } = payload;
-
+  
       if (!start_date || !end_date) {
         throw new HttpException(
           "start_date and end_date are required",
@@ -158,16 +158,17 @@ export class PowerService {
           HttpStatus.BAD_REQUEST
         );
       }
-
+  
       const matchStage: any = {
         $match: { Day: { $gte: start_date, $lte: end_date } },
       };
       if (plant) {
         matchStage.$match.Plant = plant;
       }
+  
       let groupStage;
       let sortStage = { $sort: { _id: 1 } };
-
+  
       if (option === 1) {
         groupStage = {
           $group: {
@@ -190,26 +191,32 @@ export class PowerService {
           },
         };
       }
-
+  
       const pipeline = [matchStage, groupStage, sortStage];
       const results = await this.gmHourlyModel.aggregate(pipeline);
-
+  
+      // Month names array
+      const monthNames = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+  
       return {
         data: results.map((result) => {
           const groupKey = result._id;
           const totalPower = result.total_active_power;
-          // const cost = totalPower * tarrif;
           const cost = totalPower * (tarrif ?? 0);
-
+  
           let groupLabel;
           if (option === 1) {
             groupLabel = groupKey;
           } else if (option === 2) {
             groupLabel = `Week ${groupKey}`;
           } else {
-            groupLabel = `Month ${groupKey}`;
+            // ⬇️ Here replace "Month X" with real month name
+            groupLabel = monthNames[groupKey - 1]; // month number 1-12 to index 0-11
           }
-
+  
           return {
             group: groupLabel,
             value: parseFloat(totalPower.toFixed(2)),
@@ -221,6 +228,7 @@ export class PowerService {
       throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
+  
   // Tab 1  DAY WISE CONSUMPTION
   async activePowerWeekday(payload: CalculatePowerWeekDto) {
     try {

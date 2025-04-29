@@ -164,9 +164,9 @@ export class HealthService {
       string1,
       option,
     } = dto;
-
+  
     const date_filter = date.slice(0, 10);
-
+  
     const buildQuery = (p?: string, i?: string, m?: string, s?: string) => {
       const query: any = { Day_Hour: { $regex: `^${date_filter}` } };
       if (p) query["Plant"] = p;
@@ -175,7 +175,7 @@ export class HealthService {
       if (s) query["Strings"] = s;
       return query;
     };
-
+  
     const buildPipeline = (query: any) => {
       const grouping: any = {
         date: { $substr: ["$Day_Hour", 0, 10] },
@@ -185,17 +185,28 @@ export class HealthService {
       if (query["sn"]) grouping.inverter = "$sn";
       if (query["MPPT"]) grouping.mppt = "$MPPT";
       if (query["Strings"]) grouping.string = "$Strings";
-
-      let field = "$P_abd"; // Default Power
+  
+      let field = "$P_abd"; // Default field
       if (option === "voltage") field = "$u";
       else if (option === "current") field = "$i";
-
+  
+      // Decide aggregation
+      const isStringLevel = !!query["Strings"];
+      const isPower = option === "power";
+      const isVoltageOrCurrent = option === "voltage" || option === "current";
+  
+      const aggregation = isPower
+        ? { $sum: field }
+        : isVoltageOrCurrent && !isStringLevel
+          ? { $avg: field }
+          : { $first: field }; // string level voltage/current
+  
       return [
         { $match: query },
         {
           $group: {
             _id: grouping,
-            avg_u: { $sum: field },
+            avg_u: aggregation,
           },
         },
         {
@@ -212,15 +223,15 @@ export class HealthService {
         { $sort: { _id: 1 as 1 | -1 } },
       ];
     };
-
+  
     const query1 = buildQuery(plant, inverter, mppt, string);
     const query2 = buildQuery(plant1, inverter1, mppt1, string1);
     const pipeline1 = buildPipeline(query1);
     const pipeline2 = buildPipeline(query2);
-
+  
     const results_set1 = await this.StringHourModel.aggregate(pipeline1).exec();
     const results_set2 = await this.StringHourModel.aggregate(pipeline2).exec();
-
+  
     let key1 = "Set 1",
       key2 = "Set 2";
     if (plant && !inverter && !mppt && !string) {
@@ -236,7 +247,7 @@ export class HealthService {
       key1 = `String 1 - ${string}`;
       key2 = `String 2 - ${string1}`;
     }
-
+  
     const response = {
       [key1]: results_set1.map((result) => ({
         date: result._id,
@@ -247,9 +258,10 @@ export class HealthService {
         hourly_values: result.hourly_values,
       })),
     };
-
+  
     return response;
   }
+  
 
   async getRadiationIntensityInter(
     dto: RadiationIntensityInterDto
